@@ -2,6 +2,43 @@
 
 All notable changes to `irrigationsystem` will be documented in this file. This project tries to adhere to [Semantic Versioning](http://semver.org/).
 
+## v0.0.6 (2026/08/20)
+
+### Changed
+- Updated `HomeKitDevice` to the 2026/08/18 release
+- Updated `HomeKitHistory` to the 2026/08/10 release for HAP-NodeJS 2.2 storage compatibility
+- Updated HAP-NodeJS to 2.2.2 and Chalk to 6.0.0
+- Updated development dependencies to their latest releases
+
+## v0.0.5 (2026/06/26)
+
+### Changed
+- Improved dashboard layout:
+  - Increased the available dashboard width
+  - Allowed water usage and other dashboard cards to use the full available width
+  - Grouped water usage and water tanks into a responsive lower dashboard section
+  - Added a responsive grid for displaying multiple water tanks
+- Simplified ultrasonic water tank readings to use the current sample median instead of a rolling smoothing buffer
+- Updated development dependencies
+
+### Fixed
+- Fixed valid water level changes being delayed or rejected as ultrasonic spikes
+
+## v0.0.4 (2026/06/05)
+
+### Added
+- Added flow sensor pulse filtering to ignore pulses received within 20ms of the previous pulse
+- Added debug logging for tank, zone, and option changes applied from the Web UI
+- Added stable ultrasonic spike recovery after three consistent water tank readings establish a new baseline
+
+### Changed
+- Improved HomeKit name sanitisation to support Unicode spacing and common punctuation while preserving valid start and end characters
+- Updated HAP-NodeJS and development dependencies
+
+### Fixed
+- Fixed electrical noise being counted as additional flow sensor pulses
+- Fixed legitimate water level changes being permanently rejected when they differed significantly from the previous ultrasonic baseline
+
 ## v0.0.3 (2026/05/13)
 
 ### Fixed

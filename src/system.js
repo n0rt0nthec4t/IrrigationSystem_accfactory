@@ -1932,6 +1932,8 @@ export default class IrrigationSystem extends HomeKitDevice {
     let renderTankSection = () => {
       let html = '';
 
+      html += '<section class="dashboard-tanks-section">';
+
       html += '<div class="dashboard-section-title">';
       html += '<div class="card-title">Water Tanks</div>';
       html += '<div class="list-sub">Current water levels in configured tanks</div>';
@@ -1984,6 +1986,7 @@ export default class IrrigationSystem extends HomeKitDevice {
       });
 
       html += '</div>';
+      html += '</section>';
 
       return html;
     };
@@ -1992,7 +1995,22 @@ export default class IrrigationSystem extends HomeKitDevice {
 /* Dashboard layout */
 .irrigation-dashboard .dashboard-section,
 .irrigation-dashboard .dashboard-inner {
-  max-width: 980px;
+  width: min(100%, 1180px);
+}
+
+.irrigation-dashboard .dashboard-lower-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+.irrigation-dashboard .dashboard-lower-grid > .dashboard-card {
+  margin-bottom: 0;
+}
+
+.irrigation-dashboard .dashboard-tanks-section .dashboard-section-title {
+  margin-top: 0;
 }
 
 /* Collapsible sections */
@@ -2017,7 +2035,7 @@ export default class IrrigationSystem extends HomeKitDevice {
 /* Common card system */
 .irrigation-dashboard .dashboard-card {
   width: 100%;
-  max-width: 920px;
+  max-width: none;
   padding: 16px 22px;
   margin-bottom: 34px;
   border: 1px solid rgba(0,0,0,0.08);
@@ -2338,7 +2356,7 @@ export default class IrrigationSystem extends HomeKitDevice {
   
 /* Water usage */
 .irrigation-dashboard .dashboard-usage-card {
-  max-width: 620px;
+  max-width: none;
 }
 
 .irrigation-dashboard .dashboard-usage-header {
@@ -2529,9 +2547,9 @@ export default class IrrigationSystem extends HomeKitDevice {
 /* Water tanks */
 .irrigation-dashboard .dashboard-tank-card {
   width: 300px;
-  max-width: 90%;
+  max-width: 100%;
   padding: 20px 18px;
-  margin-right: auto;
+  margin-bottom: 0;
 }
 
 .irrigation-dashboard .dashboard-tank-card .dashboard-card-heading {
@@ -2659,10 +2677,20 @@ export default class IrrigationSystem extends HomeKitDevice {
 }
 
 .irrigation-dashboard .dashboard-tank-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 300px);
+  gap: 18px;
+  justify-content: start;
   margin-top: 10px;
 }
 
 /* Responsive */
+@media (max-width: 1100px) {
+  .irrigation-dashboard .dashboard-lower-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 900px) {
   .irrigation-dashboard .dashboard-summary-content {
     grid-template-columns: 64px 1fr;
@@ -2689,7 +2717,7 @@ export default class IrrigationSystem extends HomeKitDevice {
   }
 
   .irrigation-dashboard .dashboard-usage-card {
-    max-width: 920px;
+    max-width: none;
   }
 
   .irrigation-dashboard .dashboard-usage-chart {
@@ -2718,8 +2746,10 @@ export default class IrrigationSystem extends HomeKitDevice {
 
     html += renderSummaryCard();
     html += renderZonesSection();
+    html += '<div class="dashboard-lower-grid">';
     html += renderWaterUsageSection();
     html += renderTankSection();
+    html += '</div>';
 
     html += '</section>';
     html += '</div>';

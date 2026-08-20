@@ -7,8 +7,7 @@
 //
 // Responsibilities:
 // - Read distance from ultrasonic sensor via external binary or GPIO fallback
-// - Apply smoothing via rolling buffer
-// - Reject obvious noisy/spike readings
+// - Use a per-sample median to reduce one-off ultrasonic noise
 // - Convert distance to water level and percentage
 // - Emit WATERLEVEL events via HomeKitDevice message bus
 // - Handle lifecycle cleanup (shutdown)
@@ -21,7 +20,7 @@
 // Flow:
 // - Execute external binary (usonic_measure), or use GPIO fallback
 // - Parse/normalise distance output
-// - Apply smoothing buffer
+// - Use the current sample median as the measured distance
 // - Convert to usable tank height
 // - Emit updated level + percentage
 //
@@ -32,7 +31,7 @@
 // - Valid trigger/echo GPIO pins
 // - External ultrasonic binary, or assigned WaterTank.GPIO library fallback
 //
-// Code version 2026.05.05
+// Code version 2026.06.26
 // Mark Hulskamp
 'use strict';
 
@@ -55,10 +54,6 @@ const USONIC_MIN_RANGE = 200; // mm
 const USONIC_MAX_RANGE = 4500; // mm
 const USONIC_TIMEOUT = 5000; // ms
 const REFRESH_INTERVAL = 60 * 1000; // ms
-const SMOOTHING_BUFFER = 5; // Number of recent readings in buffer
-const SPIKE_THRESHOLD = 300; // mm
-const SPIKE_RECOVERY_READINGS = 3; // Consecutive stable spikes before accepting a new baseline
-
 export default class WaterTank {
   static GPIO = undefined; // GPIO library override
   static WATERLEVEL_EVENT = 'WATERLEVEL';
@@ -77,8 +72,6 @@ export default class WaterTank {
   #triggerPin = undefined;
   #echoPin = undefined;
   #usonicBinary = undefined;
-  #distanceBuffer = [];
-  #spikeRecoveryBuffer = [];
 
   constructor(log = undefined, uuid = undefined, deviceData = {}) {
     // Validate the passed in logging object. We are expecting certain functions to be present
@@ -168,29 +161,21 @@ export default class WaterTank {
     if (Object.hasOwn(deviceData, 'sensorHeight') === true) {
       if (Number.isFinite(Number(deviceData.sensorHeight)) === true && Number(deviceData.sensorHeight) > 0) {
         this.#sensorHeight = Number(deviceData.sensorHeight);
-        this.#distanceBuffer = [];
-        this.#spikeRecoveryBuffer = [];
       }
     }
 
     if (Object.hasOwn(deviceData, 'minimumLevel') === true) {
       if (Number.isFinite(Number(deviceData.minimumLevel)) === true && Number(deviceData.minimumLevel) >= 0) {
         this.#minimumLevel = Number(deviceData.minimumLevel);
-        this.#distanceBuffer = [];
-        this.#spikeRecoveryBuffer = [];
       }
     }
 
     if (Object.hasOwn(deviceData, 'sensorTrigPin') === true) {
       this.#triggerPin = validGPIOPin(deviceData.sensorTrigPin) === true ? Number(deviceData.sensorTrigPin) : undefined;
-      this.#distanceBuffer = [];
-      this.#spikeRecoveryBuffer = [];
     }
 
     if (Object.hasOwn(deviceData, 'sensorEchoPin') === true) {
       this.#echoPin = validGPIOPin(deviceData.sensorEchoPin) === true ? Number(deviceData.sensorEchoPin) : undefined;
-      this.#distanceBuffer = [];
-      this.#spikeRecoveryBuffer = [];
     }
 
     if (this.#echoPin === undefined || this.#triggerPin === undefined) {
@@ -263,50 +248,6 @@ export default class WaterTank {
         distance = this.#sensorHeight;
       }
 
-      // Reject obvious ultrasonic spikes before adding to smoothing buffer.
-      if (this.#distanceBuffer.length !== 0) {
-        let baselineDistance = median(this.#distanceBuffer);
-
-        if (Math.abs(distance - baselineDistance) > SPIKE_THRESHOLD) {
-          this.#spikeRecoveryBuffer.push(distance);
-
-          if (this.#spikeRecoveryBuffer.length > SPIKE_RECOVERY_READINGS) {
-            this.#spikeRecoveryBuffer.shift();
-          }
-
-          let recoveryBaseline = median(this.#spikeRecoveryBuffer);
-          let stableRecovery =
-            this.#spikeRecoveryBuffer.length >= SPIKE_RECOVERY_READINGS &&
-            this.#spikeRecoveryBuffer.every((value) => Math.abs(value - recoveryBaseline) <= SPIKE_THRESHOLD);
-
-          if (stableRecovery === false) {
-            this?.log?.debug?.('Ignoring noisy usonic spike for tank uuid "%s": %s -> %s', this.uuid, baselineDistance, distance);
-            return;
-          }
-
-          this?.log?.debug?.(
-            'Recovering usonic baseline for tank uuid "%s" after stable readings: %s -> %s',
-            this.uuid,
-            baselineDistance,
-            recoveryBaseline,
-          );
-
-          this.#distanceBuffer = [...this.#spikeRecoveryBuffer];
-          this.#spikeRecoveryBuffer = [];
-          distance = recoveryBaseline;
-        } else {
-          this.#spikeRecoveryBuffer = [];
-        }
-      }
-
-      // Rolling distance buffer.
-      this.#distanceBuffer.push(distance);
-      if (this.#distanceBuffer.length > SMOOTHING_BUFFER) {
-        this.#distanceBuffer.shift();
-      }
-
-      // Median smoothing over recent samples.
-      let smoothedDistance = median(this.#distanceBuffer);
       let usableHeight = this.#sensorHeight - this.#minimumLevel;
 
       if (usableHeight <= 0) {
@@ -315,7 +256,7 @@ export default class WaterTank {
 
       // Distance is measured from the sensor down to the water surface.
       // Convert to usable water height, clamped between empty and full.
-      this.waterlevel = usableHeight - Math.max(0, smoothedDistance - USONIC_MIN_RANGE);
+      this.waterlevel = usableHeight - Math.max(0, distance - USONIC_MIN_RANGE);
       this.waterlevel = Math.max(0, Math.min(usableHeight, this.waterlevel));
 
       this.percentage = (this.waterlevel / usableHeight) * 100;

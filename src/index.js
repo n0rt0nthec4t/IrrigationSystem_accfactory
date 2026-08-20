@@ -398,7 +398,7 @@ if (config.options.webUIPort > 0) {
       // Options changed
       if (JSON.stringify(config.options) !== JSON.stringify(newConfig.options)) {
         log.debug?.('Options configuration updated from Web UI');
-        
+
         await HomeKitDevice.message(accessory.UUID, HomeKitDevice.UPDATE, {
           eveHistory: newConfig.options.eveHistory,
           elevation: newConfig.options.elevation,
